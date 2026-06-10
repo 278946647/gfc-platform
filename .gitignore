@@ -1,0 +1,54 @@
+# Local secrets and runtime config (keep *.example templates)
+gfc.env
+.env
+.env.*
+!.env.example
+scripts/gfc.env
+deploy/node/install.env
+deploy/node/node.env
+**/install.env
+!**/install.env.example
+!**/node.env.example
+!scripts/gfc-control.env.example
+!scripts/gfc.env.example
+
+# Database and PKI (never commit production data)
+gfc.db
+*.db
+data/pki/
+*.pem
+*.crt
+*.key
+!**/*.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+web-ui/dist/
+.npm/
+
+# Runtime / logs
+logs/
+run/
+*.log
+*.pid
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Docker local overrides (optional)
+docker-compose.override.yml
