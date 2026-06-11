@@ -161,14 +161,26 @@ export function SettingsPage() {
               }
             />
           )}
+          {!secEditable && (
+            <Alert
+              type="info"
+              showIcon
+              icon={<LockOutlined />}
+              style={{ marginBottom: 12 }}
+              message="敏感项已锁定"
+              description="Bootstrap Token 当前为只读展示，不可编辑。点击「解锁编辑」并确认后，方可修改各项安全设置。"
+            />
+          )}
           <div style={{ marginBottom: 12 }}>
             {!secEditable ? (
               <Button
-                type="default"
+                type="primary"
+                ghost
+                icon={<UnlockOutlined />}
                 onClick={() => {
                   Modal.confirm({
                     title: "解锁平台安全设置？",
-                    content: "解锁后可编辑敏感项。请勿在误触情况下保存。",
+                    content: "解锁后可编辑 Bootstrap Token 等敏感项。请勿在误触情况下保存。",
                     okText: "解锁编辑",
                     onOk: () => {
                       setSecEditable(true);
@@ -181,51 +193,90 @@ export function SettingsPage() {
                   });
                 }}
               >
-                <UnlockOutlined /> 解锁编辑
+                解锁编辑
               </Button>
             ) : (
-              <Button icon={<LockOutlined />} onClick={() => lockSecurityForm()}>
+              <Button danger icon={<LockOutlined />} onClick={() => lockSecurityForm()}>
                 锁定
               </Button>
             )}
           </div>
-          <Form form={secForm} layout="vertical" style={{ maxWidth: 560 }}>
-            <Form.Item
-              label="Bootstrap Token（转发节点激活）"
-              extra={
-                secEditable
-                  ? "与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
-                  : "已锁定 — 仅可复制，点击「解锁编辑」后方可修改"
-              }
-            >
-              {secEditable ? (
-                <Form.Item name="bootstrap_tokens" noStyle>
-                  <Input autoComplete="off" placeholder="输入新的 Bootstrap Token" />
-                </Form.Item>
-              ) : (
+          {!secEditable ? (
+            <div style={{ maxWidth: 560 }}>
+              <div style={{ marginBottom: 20 }}>
+                <Typography.Text strong>Bootstrap Token（转发节点激活）</Typography.Text>
+                <div style={{ color: "#8c8c8c", fontSize: 12, marginBottom: 8 }}>
+                  已锁定 — 仅可复制，不可编辑
+                </div>
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
                     gap: 12,
-                    padding: "8px 12px",
-                    background: "#fafafa",
-                    border: "1px solid #d9d9d9",
+                    padding: "10px 14px",
+                    background: "#f5f5f5",
+                    border: "1px dashed #bfbfbf",
                     borderRadius: 8,
-                    userSelect: "text",
                   }}
                 >
                   <Typography.Text copyable code style={{ margin: 0, flex: 1, wordBreak: "break-all" }}>
                     {security?.bootstrap_tokens || "—"}
                   </Typography.Text>
-                  <Tag icon={<LockOutlined />} color="default">
+                  <Tag icon={<LockOutlined />} color="processing">
                     已锁定
                   </Tag>
                 </div>
-              )}
-            </Form.Item>
-            {secEditable ? (
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <Typography.Text strong>Auth Secret（Web 会话签名）</Typography.Text>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "10px 14px",
+                    background: "#f5f5f5",
+                    border: "1px dashed #bfbfbf",
+                    borderRadius: 8,
+                    color: "#8c8c8c",
+                  }}
+                >
+                  {security?.auth_secret_configured ? "已配置（解锁后可修改）" : "未单独配置"}
+                  <Tag icon={<LockOutlined />} color="processing" style={{ marginLeft: 8 }}>
+                    已锁定
+                  </Tag>
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <Typography.Text strong>管理员新密码</Typography.Text>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "10px 14px",
+                    background: "#f5f5f5",
+                    border: "1px dashed #bfbfbf",
+                    borderRadius: 8,
+                    color: "#8c8c8c",
+                  }}
+                >
+                  解锁后可设置新密码
+                  <Tag icon={<LockOutlined />} color="processing" style={{ marginLeft: 8 }}>
+                    已锁定
+                  </Tag>
+                </div>
+              </div>
+              <Button type="primary" disabled>
+                保存安全设置（请先解锁）
+              </Button>
+            </div>
+          ) : (
+            <Form form={secForm} layout="vertical" style={{ maxWidth: 560 }} key="security-edit-form">
+              <Form.Item
+                name="bootstrap_tokens"
+                label="Bootstrap Token（转发节点激活）"
+                extra="与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
+                rules={[{ required: true, message: "请输入 Bootstrap Token" }]}
+              >
+                <Input autoComplete="off" placeholder="输入新的 Bootstrap Token" />
+              </Form.Item>
               <Form.Item
                 name="auth_secret"
                 label="Auth Secret（Web 会话签名）"
@@ -233,25 +284,6 @@ export function SettingsPage() {
               >
                 <Input.Password autoComplete="new-password" placeholder="留空不修改" />
               </Form.Item>
-            ) : (
-              <Form.Item label="Auth Secret（Web 会话签名）" extra="已锁定">
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    background: "#fafafa",
-                    border: "1px solid #d9d9d9",
-                    borderRadius: 8,
-                    color: "#8c8c8c",
-                  }}
-                >
-                  {security?.auth_secret_configured ? "已配置（解锁后可修改）" : "未单独配置"}
-                  <Tag icon={<LockOutlined />} color="default" style={{ marginLeft: 8 }}>
-                    已锁定
-                  </Tag>
-                </div>
-              </Form.Item>
-            )}
-            {secEditable ? (
               <Form.Item
                 name="admin_password"
                 label="管理员新密码"
@@ -259,33 +291,14 @@ export function SettingsPage() {
               >
                 <Input.Password autoComplete="new-password" placeholder="留空不修改" />
               </Form.Item>
-            ) : (
-              <Form.Item label="管理员新密码" extra="已锁定">
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    background: "#fafafa",
-                    border: "1px solid #d9d9d9",
-                    borderRadius: 8,
-                    color: "#8c8c8c",
-                  }}
-                >
-                  解锁后可设置新密码
-                  <Tag icon={<LockOutlined />} color="default" style={{ marginLeft: 8 }}>
-                    已锁定
-                  </Tag>
-                </div>
-              </Form.Item>
-            )}
-            <Button
-              type="primary"
-              loading={secLoading}
-              disabled={!secEditable}
-              onClick={() => saveSecurity()}
-            >
-              保存安全设置
-            </Button>
-          </Form>
+              <Button type="primary" loading={secLoading} onClick={() => saveSecurity()}>
+                保存安全设置
+              </Button>
+            </Form>
+          )}
+          <Typography.Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 16 }}>
+            安全设置界面 v2 — 锁定态为灰色虚线只读框（非输入框）
+          </Typography.Text>
         </Card>
       )}
 
