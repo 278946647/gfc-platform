@@ -102,6 +102,18 @@ if [[ -f /etc/gfc-node/static-routes.json ]]; then
   ip route show | head -30
 fi
 
+SNAT_IF=$(grep -E '^GFC_SNAT_IFACE=' /etc/gfc-node/gfc.env 2>/dev/null | cut -d= -f2- || echo auto)
+if [[ "$SNAT_IF" == "auto" ]]; then
+  SNAT_IF=$(ip -4 route show default 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}' | head -1)
+fi
+if [[ -n "$SNAT_IF" && "$SNAT_IF" != "0" && "$SNAT_IF" != "off" ]]; then
+  if nft list table ip gfc-nat 2>/dev/null | grep -q "oifname \"${SNAT_IF}\""; then
+    echo "    OK egress SNAT masquerade on ${SNAT_IF}"
+  else
+    echo "    WARN missing SNAT on ${SNAT_IF} — sudo systemctl restart gfc-node-agent"
+  fi
+fi
+
 if ip rule list 2>/dev/null | grep -q 'fwmark 0x1.*lookup 100'; then
   echo "    OK TPROXY policy: fwmark 0x1 lookup 100"
 else

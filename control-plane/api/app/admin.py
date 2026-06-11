@@ -21,6 +21,11 @@ from .email_settings import (
     save_smtp_settings,
     smtp_to_public,
 )
+from .platform_secrets import (
+    load_security_settings,
+    save_security_settings,
+    security_to_public,
+)
 from .models import AlertEvent, FlowStat, Line, Node, OperationLog, PlatformUser, SocksProfile
 from .security import hash_password
 from .timeutil import ensure_utc, parse_json_field, seconds_ago, utc_now
@@ -42,6 +47,7 @@ from .schemas import (
     SocksProfileOut,
     SocksProfileUpdate,
     EmailSettingsIn,
+    SecuritySettingsIn,
     StaticRouteIn,
     UserIn,
     UserOut,
@@ -912,6 +918,40 @@ async def put_email_settings(
     await _log_op(session, operator.username, "update_email_settings", "smtp")
     await session.commit()
     return smtp_to_public(stored)
+
+
+@router.get("/settings/security", dependencies=[Depends(require_admin)])
+async def get_security_settings(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    data = await load_security_settings(session)
+    if not data:
+        from .platform_secrets import ensure_platform_secrets
+
+        data = await ensure_platform_secrets(session)
+    return security_to_public(data)
+
+
+@router.put("/settings/security", dependencies=[Depends(require_admin)])
+async def put_security_settings(
+    body: SecuritySettingsIn,
+    session: AsyncSession = Depends(get_session),
+    operator: PlatformUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    if not body.confirm:
+        raise HTTPException(400, "请勾选确认后再保存（confirm=true）")
+    if not any([body.bootstrap_tokens, body.auth_secret, body.admin_password]):
+        raise HTTPException(400, "未提交任何要修改的字段")
+    try:
+        data = await save_security_settings(
+            session,
+            bootstrap_tokens=body.bootstrap_tokens,
+            auth_secret=body.auth_secret,
+            admin_password=body.admin_password,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    await _log_op(session, operator.username, "update_security_settings", "platform")
+    await session.commit()
+    return security_to_public(data)
 
 
 @router.post("/settings/email/test", dependencies=[Depends(require_admin)])

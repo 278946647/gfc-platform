@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .admin import router as admin_router
 from .auth_routes import router as auth_router
 from .email_settings import load_smtp_settings
+from .platform_secrets import ensure_platform_secrets, get_bootstrap_tokens
 from .db import async_session_factory, engine, get_session
 from .alerts import send_email
 from .migrate import migrate_sqlite
@@ -56,6 +57,7 @@ async def _lifespan(_app: FastAPI):
                 session.add(admin)
                 await session.commit()
         await load_smtp_settings(session)
+        await ensure_platform_secrets(session)
 
     stop = asyncio.Event()
     task = asyncio.create_task(monitor_loop(stop))
@@ -82,7 +84,7 @@ node_last_seen = Gauge("gfc_node_last_seen_seconds", "Node last seen epoch secon
 
 
 def _bootstrap_tokens() -> set[str]:
-    return {t.strip() for t in settings.bootstrap_tokens.split(",") if t.strip()}
+    return get_bootstrap_tokens()
 
 
 async def _auth_node(

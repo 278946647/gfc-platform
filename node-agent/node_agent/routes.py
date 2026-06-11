@@ -17,6 +17,51 @@ def _run(cmd: list[str]) -> tuple[bool, str]:
     return False, (r.stderr or r.stdout or "failed").strip()
 
 
+def default_route_iface() -> str | None:
+    ok, out = _run(["ip", "-4", "route", "show", "default"])
+    if not ok:
+        return None
+    for line in out.splitlines():
+        parts = line.split()
+        if "dev" in parts:
+            return parts[parts.index("dev") + 1]
+    return None
+
+
+def resolve_snat_iface() -> str | None:
+    raw = os.environ.get("GFC_SNAT_IFACE", "auto").strip().lower()
+    if raw in ("", "0", "false", "no", "off", "none"):
+        return None
+    if raw == "auto":
+        return default_route_iface()
+    return raw
+
+
+def egress_snat_active(iface: str) -> bool:
+    ok, out = _run(["nft", "list", "table", "ip", "gfc-nat"])
+    return ok and f'oifname "{iface}"' in out and "masquerade" in out
+
+
+def apply_egress_snat(iface: str | None) -> tuple[bool, str]:
+    if not iface:
+        return True, "snat disabled"
+    subprocess.run(["nft", "delete", "table", "ip", "gfc-nat"], capture_output=True, text=True)
+    script = f"""#!/usr/sbin/nft -f
+table ip gfc-nat {{
+  chain postrouting {{
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "{iface}" masquerade
+  }}
+}}
+"""
+    path = GFC_ETC / "gfc-snat.nft"
+    path.write_text(script, encoding="utf-8")
+    r = subprocess.run(["nft", "-f", str(path)], capture_output=True, text=True)
+    if r.returncode != 0:
+        return False, f"snat fail: {r.stderr or r.stdout}"
+    return True, f"snat masquerade oif {iface}"
+
+
 def tproxy_policy_active() -> bool:
     """TPROXY reply path needs fwmark 0x1 -> table 100 with local default via lo."""
     ok, rules = _run(["ip", "rule", "show"])

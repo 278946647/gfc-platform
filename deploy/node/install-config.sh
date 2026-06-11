@@ -48,6 +48,7 @@ gfc_load_install_env_file() {
   export REPO_SRC="${REPO_SRC:-}"
   export SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.4}"
   export POLL_SECONDS="${POLL_SECONDS:-10}"
+  export GFC_SNAT_IFACE="${GFC_SNAT_IFACE:-auto}"
   return 0
 }
 
@@ -177,6 +178,7 @@ GFC_TPROXY_IFACE=${GFC_TPROXY_IFACE}
 STATE_FILE=${gfc_root}/node-agent/state/node_state.json
 CONFIG_DIR=${gfc_root}/node-agent/state/dataplane
 POLL_SECONDS=${poll}
+GFC_SNAT_IFACE=${GFC_SNAT_IFACE:-auto}
 EOF
   chmod 600 "$gfc_env"
   echo "==> 已写入 $gfc_env"

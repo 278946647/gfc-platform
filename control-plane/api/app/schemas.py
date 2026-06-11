@@ -315,6 +315,27 @@ class EmailSettingsIn(BaseModel):
     starttls: bool = False
 
 
+class SecuritySettingsIn(BaseModel):
+    confirm: bool = Field(
+        default=False,
+        description="Must be true — confirms admin understands impact (node sync / logout).",
+    )
+    bootstrap_tokens: str | None = Field(
+        default=None,
+        description="Comma-separated bootstrap tokens for new nodes; synced to forward nodes.",
+    )
+    auth_secret: str | None = Field(
+        default=None,
+        min_length=16,
+        description="JWT signing secret; changing logs out all Web sessions.",
+    )
+    admin_password: str | None = Field(
+        default=None,
+        min_length=8,
+        description="New password for admin user.",
+    )
+
+
 class UserOut(BaseModel):
     id: int
     username: str

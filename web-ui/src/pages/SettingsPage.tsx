@@ -1,6 +1,18 @@
-import { Button, Card, Form, Input, InputNumber, Switch, Typography, message } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Switch,
+  Typography,
+  message,
+} from "antd";
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, apiPut } from "../api/client";
+import { getUser } from "../api/auth";
 
 type EmailSettings = {
   configured: boolean;
@@ -14,10 +26,23 @@ type EmailSettings = {
   starttls?: boolean;
 };
 
+type SecuritySettings = {
+  bootstrap_tokens: string;
+  auth_secret_configured: boolean;
+  generated_admin_password?: string | null;
+  source: string;
+  syncs_to_nodes: string[];
+  updated_at?: string;
+};
+
 export function SettingsPage() {
   const [form] = Form.useForm();
+  const [secForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [secLoading, setSecLoading] = useState(false);
   const [meta, setMeta] = useState<EmailSettings | null>(null);
+  const [security, setSecurity] = useState<SecuritySettings | null>(null);
+  const isAdmin = getUser()?.role === "admin";
 
   const load = async () => {
     const s = await apiGet<EmailSettings>("/admin/settings/email");
@@ -32,13 +57,111 @@ export function SettingsPage() {
     });
   };
 
+  const loadSecurity = async () => {
+    if (!isAdmin) return;
+    const s = await apiGet<SecuritySettings>("/admin/settings/security");
+    setSecurity(s);
+    secForm.setFieldsValue({
+      bootstrap_tokens: s.bootstrap_tokens,
+    });
+  };
+
   useEffect(() => {
     void load().catch((e) => message.error(String(e)));
-  }, [form]);
+    void loadSecurity().catch((e) => message.error(String(e)));
+  }, [form, secForm, isAdmin]);
+
+  const saveSecurity = async () => {
+    const v = await secForm.validateFields();
+    const hasChange = v.bootstrap_tokens || v.auth_secret || v.admin_password;
+    if (!hasChange) {
+      message.warning("请填写要修改的项");
+      return;
+    }
+    Modal.confirm({
+      title: "确认修改平台安全设置？",
+      content: (
+        <div>
+          <p>修改 Bootstrap Token 将在约 10 秒内同步到所有转发节点的 /etc/gfc-node/gfc.env。</p>
+          <p>修改 Auth Secret 将使所有已登录 Web 会话失效，需重新登录。</p>
+          <p>修改管理员密码后请使用新密码登录。</p>
+        </div>
+      ),
+      okText: "确认保存",
+      cancelText: "取消",
+      onOk: async () => {
+        setSecLoading(true);
+        try {
+          await apiPut("/admin/settings/security", {
+            confirm: true,
+            bootstrap_tokens: v.bootstrap_tokens || null,
+            auth_secret: v.auth_secret || null,
+            admin_password: v.admin_password || null,
+          });
+          message.success("安全设置已保存");
+          secForm.setFieldsValue({ auth_secret: "", admin_password: "" });
+          await loadSecurity();
+        } catch (e) {
+          message.error(String(e));
+        } finally {
+          setSecLoading(false);
+        }
+      },
+    });
+  };
 
   return (
     <div>
       <Typography.Title level={4}>系统设置</Typography.Title>
+
+      {isAdmin && (
+        <Card title="平台安全" style={{ marginBottom: 16 }}>
+          <Typography.Paragraph type="secondary">
+            首次安装时系统会自动生成 Bootstrap Token、Auth Secret 与管理员密码（写入数据库）。
+            修改 Bootstrap Token 会主动同步到转发节点；仅管理员可修改，保存前需确认。
+          </Typography.Paragraph>
+          {security?.generated_admin_password && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="首次安装自动生成的管理员密码"
+              description={
+                <Typography.Text copyable code>
+                  {security.generated_admin_password}
+                </Typography.Text>
+              }
+            />
+          )}
+          <Form form={secForm} layout="vertical" style={{ maxWidth: 560 }}>
+            <Form.Item
+              name="bootstrap_tokens"
+              label="Bootstrap Token（转发节点激活）"
+              extra="与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="auth_secret"
+              label="Auth Secret（Web 会话签名）"
+              extra={security?.auth_secret_configured ? "已配置；留空表示不修改" : "留空表示不修改"}
+            >
+              <Input.Password placeholder="留空不修改" />
+            </Form.Item>
+            <Form.Item
+              name="admin_password"
+              label="管理员新密码"
+              extra="至少 8 位；留空表示不修改"
+            >
+              <Input.Password placeholder="留空不修改" />
+            </Form.Item>
+            <Button type="primary" loading={secLoading} onClick={() => void saveSecurity()}>
+              保存安全设置
+            </Button>
+          </Form>
+        </Card>
+      )}
+
       <Card title="邮件告警 (SMTP)">
         <Typography.Paragraph type="secondary">
           用于节点离线、服务异常、SOCKS 不可用等告警邮件。保存后写入控制平台数据库；若未配置则回退到环境变量

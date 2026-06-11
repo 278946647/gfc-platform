@@ -39,8 +39,29 @@ def constant_time_equal(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
+_auth_secret_memo: str | None = None
+
+
+def invalidate_auth_secret_cache() -> None:
+    global _auth_secret_memo
+    _auth_secret_memo = None
+
+
 def _auth_secret() -> str:
-    return os.getenv("GFC_AUTH_SECRET") or os.getenv("GFC_TOKEN_SALT") or "dev-auth-secret-change-me"
+    global _auth_secret_memo
+    if _auth_secret_memo is not None:
+        return _auth_secret_memo
+    try:
+        from .platform_secrets import get_auth_secret
+
+        _auth_secret_memo = get_auth_secret()
+        return _auth_secret_memo
+    except ImportError:
+        pass
+    _auth_secret_memo = (
+        os.getenv("GFC_AUTH_SECRET") or os.getenv("GFC_TOKEN_SALT") or "dev-auth-secret-change-me"
+    )
+    return _auth_secret_memo
 
 
 def hash_password(password: str) -> str:

@@ -143,6 +143,7 @@ REGION=${REGION}
 GFC_ROOT=${GFC_ROOT}
 GFC_ETC=/etc/gfc-node
 GFC_TPROXY_IFACE=${GFC_TPROXY_IFACE}
+GFC_SNAT_IFACE=${GFC_SNAT_IFACE:-auto}
 STATE_FILE=${GFC_ROOT}/node-agent/state/node_state.json
 CONFIG_DIR=${GFC_ROOT}/node-agent/state/dataplane
 POLL_SECONDS=${POLL_SECONDS}
@@ -207,6 +208,23 @@ if [[ -n "${GFC_TPROXY_IFACE:-}" ]]; then
   echo "==> TPROXY policy routing (fwmark 0x1 -> table 100)"
   ip rule add fwmark 0x1 lookup 100 2>/dev/null || true
   ip route replace local 0.0.0.0/0 dev lo table 100 2>/dev/null || true
+fi
+
+SNAT_IF="${GFC_SNAT_IFACE:-auto}"
+if [[ "$SNAT_IF" == "auto" ]]; then
+  SNAT_IF=$(ip -4 route show default 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}' | head -1)
+fi
+if [[ -n "$SNAT_IF" && "$SNAT_IF" != "0" && "$SNAT_IF" != "off" ]]; then
+  echo "==> Egress SNAT on $SNAT_IF (Windows NCSI / default route)"
+  nft delete table ip gfc-nat 2>/dev/null || true
+  nft -f - <<EOF
+table ip gfc-nat {
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "${SNAT_IF}" masquerade
+  }
+}
+EOF
 fi
 
 systemctl daemon-reload

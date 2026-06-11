@@ -6,7 +6,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from .routes import apply_static_routes, ensure_tproxy_policy
+from .env_sync import sync_bootstrap_token
+from .routes import (
+    apply_egress_snat,
+    apply_static_routes,
+    ensure_tproxy_policy,
+    resolve_snat_iface,
+)
 from .singbox import render_singbox_config, singbox_config_ok
 from .socks_health import evaluate_socks_dns_health, format_dns_health_summary
 from .sysctl_util import ensure_network_tuning
@@ -91,6 +97,16 @@ def apply_payload(payload: dict[str, Any], config_dir: Path) -> tuple[bool, str]
         iface = os.environ.get("GFC_TPROXY_IFACE", "").strip() or None
     if iface:
         messages.extend(ensure_tproxy_policy(tproxy_port))
+
+    snat_iface = resolve_snat_iface()
+    ok_snat, msg_snat = apply_egress_snat(snat_iface)
+    messages.append(f"snat: {msg_snat}")
+    if not ok_snat:
+        return False, "; ".join(messages)
+
+    drift = sync_bootstrap_token(payload.get("bootstrapToken"))
+    if drift:
+        messages.append(drift)
     nft = _render_nftables(tproxy_port, iface)
     if nft:
         NFTABLES_CONFIG.write_text(nft, encoding="utf-8")

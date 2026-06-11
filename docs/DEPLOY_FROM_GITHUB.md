@@ -21,8 +21,8 @@ git commit -m "fix: production docker, tproxy policy, control plane install"
 git push origin main
 
 # 打版本标签（服务器建议 checkout 此 tag）
-git tag -a v0.2.1 -m "Clean deploy: docker install, tproxy fix, curl probe"
-git push origin v0.2.1
+git tag -a v0.2.2 -m "Auto security, SNAT, tproxy fix, clean deploy"
+git push origin v0.2.2
 ```
 
 ## 2. 控制平台（干净 VM）
@@ -34,7 +34,7 @@ sudo apt install -y git
 # 公开仓库
 sudo git clone https://github.com/278946647/gfc-platform.git /opt/gfc
 cd /opt/gfc
-sudo git checkout v0.2.1
+sudo git checkout v0.2.2
 
 # 一键安装 Docker + 启动（或已 clone 后执行）
 sudo bash deploy/control/install-docker.sh
@@ -42,37 +42,32 @@ sudo bash deploy/control/install-docker.sh
 
 **私有仓库**：用 PAT 或 SSH clone，见 README。
 
-### 配置生产密钥
+### 首次密钥（自动生成）
+
+**无需手工填写 `.env`**。首次启动 API 时系统自动生成并写入数据库：
+
+- Bootstrap Token
+- Auth Secret
+- 管理员初始密码
+
+查看方式（任选）：
+
+1. Web UI → **系统设置 → 平台安全**（管理员登录后）
+2. 控制面日志：`docker-compose logs api | grep 'GFC] Security initialized'`
 
 ```bash
 cd /opt/gfc
-sudo cp .env.example .env
-sudo nano .env
-```
-
-修改：
-
-- `GFC_BOOTSTRAP_TOKENS` — 转发节点激活用，记住此值
-- `GFC_ADMIN_DEFAULT_PASSWORD` — Web 登录密码
-- `GFC_AUTH_SECRET` — 随机长字符串（`openssl rand -hex 32`）
-
-应用：
-
-```bash
-cd /opt/gfc
-sudo docker-compose up -d --build
-# 或: sudo docker compose up -d --build
+sudo docker-compose logs api 2>&1 | grep "GFC] Security"
 ```
 
 ### 验证控制平台
 
 ```bash
 curl -fsS http://127.0.0.1:8080/healthz
-docker-compose exec api printenv GFC_BOOTSTRAP_TOKENS
 docker-compose exec api curl -fsS https://api.ipify.org
 ```
 
-浏览器：`http://<控制面IP>:5173`，用户 `admin`，密码为 `.env` 中配置。
+浏览器：`http://<控制面IP>:5173`，用户 `admin`，密码见「平台安全」页或启动日志。
 
 ## 3. 转发节点（干净 VM）
 
@@ -82,7 +77,7 @@ sudo apt install -y git
 
 sudo git clone https://github.com/278946647/gfc-platform.git /var/socks
 cd /var/socks
-sudo git checkout v0.2.1
+sudo git checkout v0.2.2
 ```
 
 ### 方式 A：交互安装（推荐）
@@ -98,9 +93,9 @@ sudo bash deploy/node/install.sh
 |----|------|
 | 控制平台 IP | `103.78.41.16` |
 | API 端口 | `8080` |
-| Bootstrap Token | 与 `.env` 中 `GFC_BOOTSTRAP_TOKENS` **完全一致** |
+| Bootstrap Token | 与控制面「系统设置 → 平台安全」中显示的一致 |
 | NODE_NAME | `hka-node-one` |
-| TPROXY 网卡 | VyOS/客户流量入向网卡，如 `ens224` |
+| TPROXY 网卡 | 安装时从列表选择「客户/VyOS 入向」网卡（名称因云平台而异） |
 
 ### 方式 B：配置文件
 
@@ -125,7 +120,7 @@ sudo gfc-logs agent -n 30
 1. 登录控制平台
 2. **代理配置**：添加 SOCKS，点探测应显示 `exit_ip=...`（非 curl skipped）
 3. **客户线路**：选节点 + SOCKS + 源 IP 段（如 `10.10.10.0/30`）
-4. **回程路由**（以太网模式）：前缀 `10.10.10.0/30`，下一跳 VyOS IP，设备 `ens224`
+4. **回程路由**（以太网模式）：前缀为客户网段，下一跳 VyOS IP，设备为 TPROXY 入向网卡
 
 ## 5. 下联 PC 测试
 
@@ -143,12 +138,12 @@ sudo gfc-logs agent -n 30
 | DNS 不通但 SOCKS curl 正常 | `ip rule list` 无 fwmark → `force-reapply.sh` 或重启 agent |
 | 代理探测 curl skipped | 重建 API 镜像：`docker-compose up -d --build api` |
 
-## 本版修复清单（v0.2.1）
+## 本版修复清单（v0.2.2）
 
-- Web UI Docker 生产构建（nginx）
-- API 镜像内置 curl（SOCKS 探测）
-- `docker-compose` 读取 `.env` 配置密钥
-- PKI 持久化目录 `/data/pki`
+- 平台安全：首次自动生成 Bootstrap / Auth Secret / 管理员密码
+- Web UI「系统设置 → 平台安全」：仅管理员可改，弹窗确认后生效
+- Bootstrap Token 修改后自动同步到转发节点 `gfc.env`
+- 转发节点默认出口 SNAT（`GFC_SNAT_IFACE=auto`，修复 Windows 无 Internet 标识）
 - TPROXY 策略路由 `fwmark 0x1` 修复与开机补全
-- 控制面 `deploy/control/install-docker.sh` 一键脚本
-- `.gitignore` 防止密钥入库
+- Web UI Docker 生产构建、API 内置 curl（SOCKS 探测）
+- `deploy/control/install-docker.sh` 控制面一键脚本

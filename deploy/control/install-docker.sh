@@ -58,7 +58,7 @@ cd "$CLONE_DIR"
 
 if [[ ! -f .env ]]; then
   cp .env.example .env
-  echo "==> Created $CLONE_DIR/.env — edit secrets before production use"
+  echo "==> Created $CLONE_DIR/.env (optional — secrets auto-generate on first API start)"
 fi
 
 if docker compose version >/dev/null 2>&1; then

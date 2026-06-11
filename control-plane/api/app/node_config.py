@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from .models import Line, Node, SocksProfile
+from .platform_secrets import get_primary_bootstrap_token
 
 
 def _collect_line_cidrs(lines: list[Line]) -> list[str]:
@@ -109,6 +110,7 @@ def build_node_payload(
         "connectMode": connect_mode,
         "vpn": vpn,
         "tproxyIface": tproxy_iface,
+        "bootstrapToken": get_primary_bootstrap_token(),
         "staticRoutes": static_routes,
         "dataplane": {
             "tproxyPort": 12345,
