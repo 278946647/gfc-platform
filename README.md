@@ -1,101 +1,113 @@
-## Global Forwarding Control Plane (MVP)
+# Global Forwarding Control Plane (GFC)
 
-This repository contains:
+全球转发控制平台：集中管理转发节点、客户线路、SOCKS 代理与告警；转发节点在 Ubuntu 裸机上以 sing-box + TPROXY 透明代理运行。
 
-- `control-plane/api`: Control plane API (FastAPI) for node activation, discovery, config orchestration, stats & alerts.
-- `web-ui`: Web management UI (Vite + React).
-- `node-agent`: Forward node agent that activates, heartbeats, pulls config and acks apply.
-- `deploy`: VM/K8s deployment helpers (install script, systemd units, k8s manifests).
+**GitHub:** https://github.com/278946647/gfc-platform
 
-### 运维与故障排查
+---
 
-See [docs/OPS.md](docs/OPS.md) — 架构说明、日志保留、排查流程、`gfc-logs` 命令。
+## 文档
 
-### Forward node (Ubuntu 20.04+ one-click)
+| 文档 | 说明 |
+|------|------|
+| **[开局配置与迭代升级手册](docs/SETUP_AND_UPGRADE.md)** | **主文档** — Cursor/Git 同步、控制面/转发节点开局、在线升级 |
+| [运维与故障排查](docs/OPS.md) | 架构、日志、`gfc-logs`、常见故障流程 |
+| [转发节点部署](docs/NODE_DEPLOY.md) | 节点安装参数与产物说明 |
+| [GitHub 部署 checklist](docs/DEPLOY_FROM_GITHUB.md) | 干净 VM 验证用简版步骤 |
 
-See [docs/NODE_DEPLOY.md](docs/NODE_DEPLOY.md). After copying the repo to the node:
+---
 
-```bash
-sudo bash deploy/node/install.sh                              # 交互填写控制平台 IP、网卡等
-# 或: cp deploy/node/install.env.example deploy/node/install.env && 编辑后:
-sudo bash deploy/node/install.sh --config deploy/node/install.env
-```
+## 仓库结构
 
-### Web UI pages (reference-aligned)
+| 目录 | 说明 |
+|------|------|
+| `control-plane/api` | 控制面 API（FastAPI）：节点激活、配置下发、统计与告警 |
+| `web-ui` | Web 管理台（Vite + React） |
+| `node-agent` | 转发节点 Agent：心跳、拉配置、渲染 sing-box/nftables |
+| `deploy/control` | 控制面 Docker 安装与升级脚本 |
+| `deploy/node` | 转发节点一键安装、修复、重配脚本 |
 
-- 仪表盘、线路管理（筛选/分页/详情）、流量、健康检查、代理配置、用户管理、操作日志、使用说明
+---
 
-### 服务端一键启动
+## 快速开局
 
-**方式 A：脚本（开发/测试，推荐）— API + Web + NodeAgent 三合一**
-
-```bash
-cp /var/socks/scripts/gfc.env.example /var/socks/gfc.env
-# 编辑 gfc.env：SERVER_URL、NODE_NAME、REGION 等
-
-chmod +x /var/socks/scripts/start-all.sh
-/var/socks/scripts/start-all.sh start    # 启动全部
-/var/socks/scripts/start-all.sh status
-/var/socks/scripts/start-all.sh stop
-/var/socks/scripts/start-all.sh restart
-```
-
-日志：`/var/socks/logs/gfc-api.log`、`gfc-web.log`、`gfc-node.log`（安装 systemd 时自动配置 **约 1 天** logrotate，见 [docs/OPS.md](docs/OPS.md)）
-
-**方式 B：开机自启（systemd）**
+### 控制平台（Ubuntu 22.04 + Docker）
 
 ```bash
-chmod +x /var/socks/deploy/systemd/install-systemd.sh
-sudo /var/socks/deploy/systemd/install-systemd.sh
+sudo git clone https://github.com/278946647/gfc-platform.git /opt/gfc
+cd /opt/gfc && sudo git checkout -B main origin/main
+sudo bash deploy/control/install-docker.sh
 ```
 
-**方式 C：Docker Compose（生产推荐）**
+- Web：`http://<IP>:5173`　API：`http://<IP>:8080`
+- 首次安装自动生成 Bootstrap Token / Auth Secret / 管理员密码（见 Web **系统设置 → 平台安全**）
+
+### 转发节点（Ubuntu 20.04+ 裸机）
 
 ```bash
-cp .env.example .env   # 编辑密钥后
-docker compose up -d --build
-# Ubuntu 默认源无 compose 插件时用: docker-compose up -d --build
+sudo git clone https://github.com/278946647/gfc-platform.git /var/socks
+cd /var/socks && sudo git checkout -B main origin/main
+sudo bash deploy/node/install.sh
 ```
 
-干净 Ubuntu 一键：`sudo bash deploy/control/install-docker.sh`  
-完整开局步骤：[docs/DEPLOY_FROM_GITHUB.md](docs/DEPLOY_FROM_GITHUB.md)
+完整参数与验证见 [SETUP_AND_UPGRADE.md](docs/SETUP_AND_UPGRADE.md)。
 
-### Quick start (local dev)
+---
 
-Prereqs:
-- Python 3.11+
-- Node.js 20+
-
-Start API:
+## 已运行系统升级
 
 ```bash
-cd control-plane/api
-python -m venv .venv
-. .venv/bin/activate  # Linux/macOS
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8080
+# 控制平台（API + Web，保留数据库）
+cd /opt/gfc && sudo bash deploy/control/upgrade-control.sh
+
+# 仅 Web 前端
+cd /opt/gfc && sudo bash deploy/control/redeploy-web.sh
+
+# 转发节点
+cd /var/socks && sudo git checkout -B main origin/main
+sudo python3 deploy/node/repair_forward_node.py
 ```
 
-Start Web UI:
+日常请跟踪 **`main` 分支**；勿在 tag/detached HEAD 上 `git pull` 升级。
+
+---
+
+## 设计要点
+
+- **控制面与数据面分离**：控制平台故障时，已下发配置仍在节点本地继续转发（sing-box、nft、路由持久化在节点上）。
+- **平台安全**：Bootstrap Token 默认锁定只读；修改需解锁 + 双重确认；Token 变更可同步到在线节点。
+- **规模建议**：≤10 节点可用 Docker 控制面；转发节点建议裸机（TPROXY / nftables）。
+
+---
+
+## 本地开发
+
+**依赖：** Python 3.11+、Node.js 20+
 
 ```bash
-cd web-ui
-npm install
-npm run dev
+# API
+cd control-plane/api && python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && uvicorn app.main:app --reload --port 8080
+
+# Web
+cd web-ui && npm install && npm run dev
+
+# 演示 Agent
+cd node-agent && pip install -r requirements.txt
+python -m node_agent --server http://localhost:8080 \
+  --bootstrap-token demo-bootstrap --node-name demo --region ap-southeast-1
 ```
 
-Run a demo node agent:
+Docker 本地/生产：`cp .env.example .env && docker-compose up -d --build`
 
-```bash
-cd node-agent
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-python -m node_agent --server http://localhost:8080 --bootstrap-token demo-bootstrap --node-name demo-node --region ap-southeast-1
-```
+---
 
-### Notes
+## Web 功能
 
-- MVP security uses **bootstrap token -> node token**. mTLS is planned; see `deploy/pki/` placeholders.
-- Data plane (transparent-to-socks) is scaffolded under `deploy/dataplane/`.
+仪表盘、线路管理、流量、健康检查、代理配置（SOCKS 探测）、转发节点、回程路由、用户管理、操作日志、系统设置（平台安全 / SMTP 告警）。
 
+---
+
+## 许可与版本
+
+MVP 阶段；节点认证为 bootstrap token → node token（mTLS 规划中，见 `deploy/pki/`）。
