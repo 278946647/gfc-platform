@@ -1,3 +1,4 @@
+import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -7,6 +8,7 @@ import {
   InputNumber,
   Modal,
   Switch,
+  Tag,
   Typography,
   message,
 } from "antd";
@@ -89,13 +91,22 @@ export function SettingsPage() {
       });
       message.success("安全设置已保存");
       secForm.setFieldsValue({ auth_secret: "", admin_password: "" });
-      setSecEditable(false);
       await loadSecurity();
+      lockSecurityForm();
     } catch (e) {
       message.error(String(e));
     } finally {
       setSecLoading(false);
     }
+  };
+
+  const lockSecurityForm = () => {
+    setSecEditable(false);
+    secForm.setFieldsValue({
+      bootstrap_tokens: security?.bootstrap_tokens ?? "",
+      auth_secret: "",
+      admin_password: "",
+    });
   };
 
   const saveSecurity = () => {
@@ -159,47 +170,113 @@ export function SettingsPage() {
                     title: "解锁平台安全设置？",
                     content: "解锁后可编辑敏感项。请勿在误触情况下保存。",
                     okText: "解锁编辑",
-                    onOk: () => setSecEditable(true),
+                    onOk: () => {
+                      setSecEditable(true);
+                      secForm.setFieldsValue({
+                        bootstrap_tokens: security?.bootstrap_tokens ?? "",
+                        auth_secret: "",
+                        admin_password: "",
+                      });
+                    },
                   });
                 }}
               >
-                解锁编辑
+                <UnlockOutlined /> 解锁编辑
               </Button>
             ) : (
-              <Button onClick={() => setSecEditable(false)}>锁定</Button>
+              <Button icon={<LockOutlined />} onClick={() => lockSecurityForm()}>
+                锁定
+              </Button>
             )}
           </div>
           <Form form={secForm} layout="vertical" style={{ maxWidth: 560 }}>
             <Form.Item
-              name="bootstrap_tokens"
               label="Bootstrap Token（转发节点激活）"
               extra={
                 secEditable
                   ? "与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
-                  : "已锁定 — 点击「解锁编辑」后方可修改"
+                  : "已锁定 — 仅可复制，点击「解锁编辑」后方可修改"
               }
             >
-              <Input.Password
-                visibilityToggle={secEditable}
-                disabled={!secEditable}
-                readOnly={!secEditable}
-                placeholder={secEditable ? "" : "已锁定"}
-              />
+              {secEditable ? (
+                <Form.Item name="bootstrap_tokens" noStyle>
+                  <Input autoComplete="off" placeholder="输入新的 Bootstrap Token" />
+                </Form.Item>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "8px 12px",
+                    background: "#fafafa",
+                    border: "1px solid #d9d9d9",
+                    borderRadius: 8,
+                    userSelect: "text",
+                  }}
+                >
+                  <Typography.Text copyable code style={{ margin: 0, flex: 1, wordBreak: "break-all" }}>
+                    {security?.bootstrap_tokens || "—"}
+                  </Typography.Text>
+                  <Tag icon={<LockOutlined />} color="default">
+                    已锁定
+                  </Tag>
+                </div>
+              )}
             </Form.Item>
-            <Form.Item
-              name="auth_secret"
-              label="Auth Secret（Web 会话签名）"
-              extra={security?.auth_secret_configured ? "已配置；留空表示不修改" : "留空表示不修改"}
-            >
-              <Input.Password placeholder="留空不修改" disabled={!secEditable} />
-            </Form.Item>
-            <Form.Item
-              name="admin_password"
-              label="管理员新密码"
-              extra="至少 8 位；留空表示不修改"
-            >
-              <Input.Password placeholder="留空不修改" disabled={!secEditable} />
-            </Form.Item>
+            {secEditable ? (
+              <Form.Item
+                name="auth_secret"
+                label="Auth Secret（Web 会话签名）"
+                extra={security?.auth_secret_configured ? "已配置；留空表示不修改" : "留空表示不修改"}
+              >
+                <Input.Password autoComplete="new-password" placeholder="留空不修改" />
+              </Form.Item>
+            ) : (
+              <Form.Item label="Auth Secret（Web 会话签名）" extra="已锁定">
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "#fafafa",
+                    border: "1px solid #d9d9d9",
+                    borderRadius: 8,
+                    color: "#8c8c8c",
+                  }}
+                >
+                  {security?.auth_secret_configured ? "已配置（解锁后可修改）" : "未单独配置"}
+                  <Tag icon={<LockOutlined />} color="default" style={{ marginLeft: 8 }}>
+                    已锁定
+                  </Tag>
+                </div>
+              </Form.Item>
+            )}
+            {secEditable ? (
+              <Form.Item
+                name="admin_password"
+                label="管理员新密码"
+                extra="至少 8 位；留空表示不修改"
+              >
+                <Input.Password autoComplete="new-password" placeholder="留空不修改" />
+              </Form.Item>
+            ) : (
+              <Form.Item label="管理员新密码" extra="已锁定">
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "#fafafa",
+                    border: "1px solid #d9d9d9",
+                    borderRadius: 8,
+                    color: "#8c8c8c",
+                  }}
+                >
+                  解锁后可设置新密码
+                  <Tag icon={<LockOutlined />} color="default" style={{ marginLeft: 8 }}>
+                    已锁定
+                  </Tag>
+                </div>
+              </Form.Item>
+            )}
             <Button
               type="primary"
               loading={secLoading}
