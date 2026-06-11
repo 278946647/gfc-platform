@@ -137,11 +137,24 @@ sudo gfc-logs agent -n 30
 | Bootstrap 403 | 控制面 token 与节点 `BOOTSTRAP_TOKEN` 不一致 |
 | DNS 不通但 SOCKS curl 正常 | `ip rule list` 无 fwmark → `force-reapply.sh` 或重启 agent |
 | 代理探测 curl skipped | 重建 API 镜像：`docker-compose up -d --build api` |
+| `KeyError: ContainerConfig` | 勿用 `--force-recreate`；见下方「仅更新 Web UI」 |
+| 平台安全仍是输入框、无「界面 v2」 | 旧 Web 容器未替换；执行 `sudo bash deploy/control/redeploy-web.sh` |
+
+### 仅更新 Web UI（不重装、不动数据库）
+
+```bash
+cd /opt/gfc
+sudo bash deploy/control/redeploy-web.sh
+```
+
+脚本会：`git pull` → 无缓存 build web → 只删除并重建 `gfc_web_1`（`--no-deps`，不碰 api）→ 校验 bundle 含「安全设置界面 v2」。
+
+浏览器 **Ctrl+Shift+R** 强刷。锁定态应显示：蓝色「敏感项已锁定」、灰色虚线只读框（非输入框）、底部「安全设置界面 v2」。
 
 ## 本版修复清单（v0.2.2）
 
 - 平台安全：首次自动生成 Bootstrap / Auth Secret / 管理员密码
-- Web UI「系统设置 → 平台安全」：仅管理员可改，弹窗确认后生效
+- Web UI「系统设置 → 平台安全」：默认锁定只读展示 Token，解锁后编辑，保存双重确认
 - Bootstrap Token 修改后自动同步到转发节点 `gfc.env`
 - 转发节点默认出口 SNAT（`GFC_SNAT_IFACE=auto`，修复 Windows 无 Internet 标识）
 - TPROXY 策略路由 `fwmark 0x1` 修复与开机补全

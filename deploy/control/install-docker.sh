@@ -68,6 +68,8 @@ else
 fi
 
 echo "==> Building and starting control plane..."
+# docker-compose 1.29 + new Docker Engine: --force-recreate may hit KeyError ContainerConfig
+docker rm -f gfc_api_1 gfc_web_1 2>/dev/null || true
 "${COMPOSE[@]}" up -d --build
 
 echo ""
