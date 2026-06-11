@@ -203,6 +203,12 @@ if [[ -f "$_LOGROTATE" ]]; then
   install -m 755 "$REPO_SRC/deploy/scripts/gfc-logs.sh" /usr/local/bin/gfc-logs 2>/dev/null || true
 fi
 
+if [[ -n "${GFC_TPROXY_IFACE:-}" ]]; then
+  echo "==> TPROXY policy routing (fwmark 0x1 -> table 100)"
+  ip rule add fwmark 0x1 lookup 100 2>/dev/null || true
+  ip route replace local 0.0.0.0/0 dev lo table 100 2>/dev/null || true
+fi
+
 systemctl daemon-reload
 systemctl enable gfc-node-agent
 if command -v sing-box >/dev/null 2>&1; then

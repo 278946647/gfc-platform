@@ -11,7 +11,7 @@ from typing import Any
 from .apply import apply_payload, nftables_tproxy_active
 from .client import ControlPlaneClient, NodeState
 from .metrics import collect_metrics
-from .routes import ROUTES_STATE
+from .routes import ROUTES_STATE, tproxy_policy_active
 from .singbox import singbox_config_ok
 from .socks_health import dns_health_changed, evaluate_socks_dns_health
 from .sysctl_util import ensure_network_tuning
@@ -142,6 +142,8 @@ def run_loop(args: argparse.Namespace) -> None:
                 "GFC_TPROXY_IFACE", ""
             ).strip()
             if not need_apply and tproxy_iface and not nftables_tproxy_active():
+                need_apply = True
+            if not need_apply and tproxy_iface and not tproxy_policy_active():
                 need_apply = True
             socks_dns_ok = evaluate_socks_dns_health(payload, config_dir)
             if not need_apply and dns_health_changed(config_dir, socks_dns_ok):

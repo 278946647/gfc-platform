@@ -18,7 +18,7 @@ def probe_socks(
 ) -> tuple[bool, str]:
     """Test SOCKS5 by curling probe_url through the proxy (exit IP in body on success)."""
     if not shutil.which("curl"):
-        return True, "curl not installed — skipped"
+        return False, "curl not installed — install curl in API image/host"
     host = (host or "").strip()
     if not host or not port:
         return False, "missing host or port"

@@ -17,19 +17,32 @@ def _run(cmd: list[str]) -> tuple[bool, str]:
     return False, (r.stderr or r.stdout or "failed").strip()
 
 
+def tproxy_policy_active() -> bool:
+    """TPROXY reply path needs fwmark 0x1 -> table 100 with local default via lo."""
+    ok, rules = _run(["ip", "rule", "show"])
+    if not ok or "fwmark 0x1" not in rules or "lookup 100" not in rules:
+        return False
+    ok, routes = _run(["ip", "route", "show", "table", "100"])
+    return ok and "local" in routes
+
+
 def ensure_tproxy_policy(tproxy_port: int) -> list[str]:
     """Policy routing for TPROXY reply path (mark 0x1 -> local table)."""
+    _ = tproxy_port  # port is fixed in nftables; kept for call-site clarity
     msgs: list[str] = []
-    ok, _ = _run(["ip", "rule", "show", "fwmark", "0x1"])
-    if not ok:
+    if not tproxy_policy_active():
         ok, err = _run(["ip", "rule", "add", "fwmark", "0x1", "lookup", "100"])
         msgs.append("ip rule fwmark 1 -> table 100" if ok else f"ip rule warn: {err}")
-    ok, _ = _run(["ip", "route", "show", "table", "100"])
-    if "local" not in _:
+    ok, routes = _run(["ip", "route", "show", "table", "100"])
+    if "local" not in routes:
         ok, err = _run(
             ["ip", "route", "add", "local", "0.0.0.0/0", "dev", "lo", "table", "100"]
         )
         msgs.append("ip route table 100 local" if ok else f"route local warn: {err}")
+    elif not tproxy_policy_active():
+        msgs.append("tproxy policy incomplete")
+    else:
+        msgs.append("tproxy policy ok")
     return msgs
 
 

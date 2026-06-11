@@ -102,6 +102,15 @@ if [[ -f /etc/gfc-node/static-routes.json ]]; then
   ip route show | head -30
 fi
 
+if ip rule list 2>/dev/null | grep -q 'fwmark 0x1.*lookup 100'; then
+  echo "    OK TPROXY policy: fwmark 0x1 lookup 100"
+else
+  echo "    FAIL missing TPROXY policy (ip rule fwmark 0x1 lookup 100)"
+  echo "         fix: sudo ip rule add fwmark 0x1 lookup 100"
+  echo "              sudo ip route replace local 0.0.0.0/0 dev lo table 100"
+  echo "         or:  sudo bash deploy/node/force-reapply.sh"
+fi
+
 echo "    ip_forward=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo '?')"
 echo "    tcp_cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo '?')"
 echo "    qdisc=$(sysctl -n net.core.default_qdisc 2>/dev/null || echo '?')"

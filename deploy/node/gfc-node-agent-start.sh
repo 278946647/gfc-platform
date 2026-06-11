@@ -24,6 +24,16 @@ for v in SERVER_URL BOOTSTRAP_TOKEN NODE_NAME REGION; do
   fi
 done
 
+# TPROXY reply path (lost on reboot; ensure before agent loop).
+if [[ -n "${GFC_TPROXY_IFACE:-}" ]] && command -v ip >/dev/null 2>&1; then
+  if ! ip rule show 2>/dev/null | grep -q 'fwmark 0x1.*lookup 100'; then
+    ip rule add fwmark 0x1 lookup 100 2>/dev/null || true
+  fi
+  if ! ip route show table 100 2>/dev/null | grep -q 'local'; then
+    ip route add local 0.0.0.0/0 dev lo table 100 2>/dev/null || true
+  fi
+fi
+
 exec "$PY" "$AGENT" \
   --server "$SERVER_URL" \
   --bootstrap-token "$BOOTSTRAP_TOKEN" \

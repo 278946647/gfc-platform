@@ -49,11 +49,16 @@ chmod +x /var/socks/deploy/systemd/install-systemd.sh
 sudo /var/socks/deploy/systemd/install-systemd.sh
 ```
 
-**方式 C：Docker Compose**
+**方式 C：Docker Compose（生产推荐）**
 
 ```bash
+cp .env.example .env   # 编辑密钥后
 docker compose up -d --build
+# Ubuntu 默认源无 compose 插件时用: docker-compose up -d --build
 ```
+
+干净 Ubuntu 一键：`sudo bash deploy/control/install-docker.sh`  
+完整开局步骤：[docs/DEPLOY_FROM_GITHUB.md](docs/DEPLOY_FROM_GITHUB.md)
 
 ### Quick start (local dev)
 
