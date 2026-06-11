@@ -42,6 +42,7 @@ export function SettingsPage() {
   const [secLoading, setSecLoading] = useState(false);
   const [meta, setMeta] = useState<EmailSettings | null>(null);
   const [security, setSecurity] = useState<SecuritySettings | null>(null);
+  const [secEditable, setSecEditable] = useState(false);
   const isAdmin = getUser()?.role === "admin";
 
   const load = async () => {
@@ -71,11 +72,35 @@ export function SettingsPage() {
     void loadSecurity().catch((e) => message.error(String(e)));
   }, [form, secForm, isAdmin]);
 
-  const saveSecurity = async () => {
+  const doSaveSecurity = async () => {
     const v = await secForm.validateFields();
     const hasChange = v.bootstrap_tokens || v.auth_secret || v.admin_password;
     if (!hasChange) {
       message.warning("请填写要修改的项");
+      return;
+    }
+    setSecLoading(true);
+    try {
+      await apiPut("/admin/settings/security", {
+        confirm: true,
+        bootstrap_tokens: v.bootstrap_tokens || null,
+        auth_secret: v.auth_secret || null,
+        admin_password: v.admin_password || null,
+      });
+      message.success("安全设置已保存");
+      secForm.setFieldsValue({ auth_secret: "", admin_password: "" });
+      setSecEditable(false);
+      await loadSecurity();
+    } catch (e) {
+      message.error(String(e));
+    } finally {
+      setSecLoading(false);
+    }
+  };
+
+  const saveSecurity = () => {
+    if (!secEditable) {
+      message.warning("请先点击「解锁编辑」");
       return;
     }
     Modal.confirm({
@@ -87,25 +112,17 @@ export function SettingsPage() {
           <p>修改管理员密码后请使用新密码登录。</p>
         </div>
       ),
-      okText: "确认保存",
+      okText: "继续",
       cancelText: "取消",
-      onOk: async () => {
-        setSecLoading(true);
-        try {
-          await apiPut("/admin/settings/security", {
-            confirm: true,
-            bootstrap_tokens: v.bootstrap_tokens || null,
-            auth_secret: v.auth_secret || null,
-            admin_password: v.admin_password || null,
-          });
-          message.success("安全设置已保存");
-          secForm.setFieldsValue({ auth_secret: "", admin_password: "" });
-          await loadSecurity();
-        } catch (e) {
-          message.error(String(e));
-        } finally {
-          setSecLoading(false);
-        }
+      onOk: () => {
+        Modal.confirm({
+          title: "再次确认保存",
+          content: "此操作影响平台安全与转发节点激活，确定要保存吗？",
+          okText: "确定保存",
+          okType: "danger",
+          cancelText: "取消",
+          onOk: () => void doSaveSecurity(),
+        });
       },
     });
   };
@@ -133,29 +150,53 @@ export function SettingsPage() {
               }
             />
           )}
+          <div style={{ marginBottom: 12 }}>
+            {!secEditable ? (
+              <Button
+                type="default"
+                onClick={() => {
+                  Modal.confirm({
+                    title: "解锁平台安全设置？",
+                    content: "解锁后可编辑敏感项。请勿在误触情况下保存。",
+                    okText: "解锁编辑",
+                    onOk: () => setSecEditable(true),
+                  });
+                }}
+              >
+                解锁编辑
+              </Button>
+            ) : (
+              <Button onClick={() => setSecEditable(false)}>锁定</Button>
+            )}
+          </div>
           <Form form={secForm} layout="vertical" style={{ maxWidth: 560 }}>
             <Form.Item
               name="bootstrap_tokens"
               label="Bootstrap Token（转发节点激活）"
               extra="与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
             >
-              <Input />
+              <Input readOnly={!secEditable} />
             </Form.Item>
             <Form.Item
               name="auth_secret"
               label="Auth Secret（Web 会话签名）"
               extra={security?.auth_secret_configured ? "已配置；留空表示不修改" : "留空表示不修改"}
             >
-              <Input.Password placeholder="留空不修改" />
+              <Input.Password placeholder="留空不修改" disabled={!secEditable} />
             </Form.Item>
             <Form.Item
               name="admin_password"
               label="管理员新密码"
               extra="至少 8 位；留空表示不修改"
             >
-              <Input.Password placeholder="留空不修改" />
+              <Input.Password placeholder="留空不修改" disabled={!secEditable} />
             </Form.Item>
-            <Button type="primary" loading={secLoading} onClick={() => void saveSecurity()}>
+            <Button
+              type="primary"
+              loading={secLoading}
+              disabled={!secEditable}
+              onClick={() => saveSecurity()}
+            >
               保存安全设置
             </Button>
           </Form>

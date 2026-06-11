@@ -69,11 +69,17 @@ def get_auth_secret() -> str:
     return "dev-auth-secret-change-me"
 
 
+def password_change_required(data: dict[str, Any] | None = None) -> bool:
+    src = data if data is not None else _cache
+    return bool((src.get("generated_admin_password") or "").strip())
+
+
 def security_to_public(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "bootstrap_tokens": data.get("bootstrap_tokens") or get_primary_bootstrap_token(),
         "auth_secret_configured": bool((data.get("auth_secret") or get_auth_secret()).strip()),
         "generated_admin_password": data.get("generated_admin_password"),
+        "password_change_required": password_change_required(data),
         "source": "database" if data.get("persisted") else "env",
         "syncs_to_nodes": ["bootstrap_tokens"],
         "updated_at": data.get("updated_at"),
@@ -147,7 +153,8 @@ async def ensure_platform_secrets(session: AsyncSession) -> dict[str, Any]:
             f" initial_admin_password={generated_admin_password}"
             if generated_admin_password
             else ""
-        ),
+        )
+        + " — 初始密码亦显示于 Web 登录页，登录后须强制修改。",
         flush=True,
     )
     return data

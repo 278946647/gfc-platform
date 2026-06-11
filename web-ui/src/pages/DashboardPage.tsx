@@ -54,7 +54,7 @@ export function DashboardPage() {
       setNodes(await apiGet<NodeRow[]>("/admin/nodes"));
       const socks = (await apiGet<Record<string, unknown>[]>("/admin/socks")).map(mapSocks);
       setOfflineSocks(socks.filter((s) => !s.isHealthy));
-      const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=50");
+      const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=50&active_only=true");
       const mapped = a.map((x) => ({
         id: x.id as number,
         nodeId: x.node_id as number | null,
@@ -179,7 +179,7 @@ export function DashboardPage() {
         </Col>
         <Col span={10}>
           <Card
-            title="最近告警"
+            title="当前告警"
             extra={
               socksAlertCount > 0 ? (
                 <Tag color="orange">SOCKS 相关 {socksAlertCount}</Tag>

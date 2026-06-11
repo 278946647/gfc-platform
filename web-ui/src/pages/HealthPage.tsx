@@ -12,7 +12,7 @@ export function HealthPage() {
     const load = async () => {
       try {
         setNodes(await apiGet<NodeRow[]>("/admin/nodes"));
-        const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=100");
+        const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=100&active_only=true");
         setAlerts(
           a.map((x) => ({
             id: x.id as number,
@@ -60,7 +60,7 @@ export function HealthPage() {
         />
       </Card>
       <Card
-        title="告警事件"
+        title="当前告警"
         extra={
           <Popconfirm
             title="清空全部历史告警？"
@@ -69,7 +69,7 @@ export function HealthPage() {
               try {
                 const res = await apiDelete<{ deleted: number }>("/admin/alerts");
                 message.success(`已清理 ${res.deleted} 条告警`);
-                const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=100");
+                const a = await apiGet<Record<string, unknown>[]>("/admin/alerts?limit=100&active_only=true");
                 setAlerts(
                   a.map((x) => ({
                     id: x.id as number,

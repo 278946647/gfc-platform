@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from .active_alerts import compute_active_alerts
 from .alerts import send_test_email
 from .auth_deps import get_current_user, require_admin
 from .db import get_session
@@ -231,22 +232,9 @@ async def dashboard(session: AsyncSession = Depends(get_session)) -> DashboardOu
     socks_online = sum(1 for s in socks_rows if s.is_healthy)
     socks_offline = socks_total - socks_online
 
-    alert_open = (
-        await session.execute(
-            select(func.count())
-            .select_from(AlertEvent)
-            .where(AlertEvent.level.in_(["warn", "critical"]))
-        )
-    ).scalar_one()
-
-    socks_alert_open = (
-        await session.execute(
-            select(func.count())
-            .select_from(AlertEvent)
-            .where(AlertEvent.type.like("socks_down_%"))
-            .where(AlertEvent.level.in_(["warn", "critical"]))
-        )
-    ).scalar_one()
+    active = await compute_active_alerts(session)
+    alert_open = len(active)
+    socks_alert_open = sum(1 for a in active if str(a["type"]).startswith("socks_down_"))
 
     return DashboardOut(
         node_total=len(nodes),
@@ -849,11 +837,25 @@ async def clear_alerts(
 async def list_alerts(
     session: AsyncSession = Depends(get_session),
     limit: int = Query(100, le=500),
+    active_only: bool = Query(True, description="Only current faults (default)"),
 ) -> list[AlertOut]:
-    rows = (
-        await session.execute(
-            select(AlertEvent).order_by(AlertEvent.id.desc()).limit(limit)
-        )
+    if active_only:
+        rows = await compute_active_alerts(session)
+        rows = rows[:limit]
+        return [
+            AlertOut(
+                id=int(a["id"]),
+                node_id=a.get("node_id"),
+                line_id=a.get("line_id"),
+                level=a["level"],
+                type=a["type"],
+                message=a["message"],
+                created_at=a["created_at"],
+            )
+            for a in rows
+        ]
+    hist = (
+        await session.execute(select(AlertEvent).order_by(AlertEvent.id.desc()).limit(limit))
     ).scalars().all()
     return [
         AlertOut(
@@ -865,7 +867,7 @@ async def list_alerts(
             message=a.message,
             created_at=a.created_at,
         )
-        for a in rows
+        for a in hist
     ]
 
 

@@ -2,6 +2,7 @@ import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
+import { RequirePasswordChange } from "./components/RequirePasswordChange";
 import { MainLayout } from "./layout/MainLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LinesPage } from "./pages/LinesPage";
@@ -13,6 +14,7 @@ import { ProxiesPage } from "./pages/ProxiesPage";
 import { UsersPage } from "./pages/UsersPage";
 import { LogsPage } from "./pages/LogsPage";
 import { HelpPage } from "./pages/HelpPage";
+import { InitialPasswordPage } from "./pages/InitialPasswordPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { getToken } from "./api/auth";
@@ -34,6 +36,8 @@ export function App() {
         <Routes>
           <Route path="/login" element={getToken() ? <Navigate to="/" replace /> : <LoginPage />} />
           <Route element={<RequireAuth />}>
+            <Route path="/change-password" element={<InitialPasswordPage />} />
+            <Route element={<RequirePasswordChange />}>
             <Route path="/" element={<MainLayout />}>
               <Route index element={<DashboardPage />} />
               <Route path="nodes" element={<NodesPage />} />
@@ -47,6 +51,7 @@ export function App() {
               <Route path="logs" element={<LogsPage />} />
               <Route path="help" element={<HelpPage />} />
               <Route path="*" element={<Navigate to="/lines" replace />} />
+            </Route>
             </Route>
           </Route>
         </Routes>

@@ -4,6 +4,7 @@ export type AuthUser = {
   role: string;
   isActive: boolean;
   createdAt: string;
+  mustChangePassword?: boolean;
 };
 
 const TOKEN_KEY = "gfc_token";
@@ -33,12 +34,16 @@ export function clearAuth() {
   localStorage.removeItem(USER_KEY);
 }
 
-export function mapUser(raw: Record<string, unknown>): AuthUser {
+export function mapUser(
+  raw: Record<string, unknown>,
+  mustChangePassword = false
+): AuthUser {
   return {
     id: raw.id as number,
     username: raw.username as string,
     role: raw.role as string,
     isActive: raw.is_active as boolean,
     createdAt: raw.created_at as string,
+    mustChangePassword,
   };
 }

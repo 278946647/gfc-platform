@@ -286,6 +286,18 @@ class LoginIn(BaseModel):
 class LoginOut(BaseModel):
     token: str
     user: "UserOut"
+    must_change_password: bool = False
+
+
+class SetupHintOut(BaseModel):
+    username: str = "admin"
+    initial_password: str | None = None
+    password_change_required: bool = False
+
+
+class InitialPasswordChangeIn(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
 
 
 class ChangePasswordIn(BaseModel):
