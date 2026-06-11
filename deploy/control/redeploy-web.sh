@@ -19,8 +19,22 @@ else
   COMPOSE=(docker-compose)
 fi
 
-echo "==> git pull"
-git pull --ff-only
+echo "==> sync code from origin/main"
+git fetch origin
+if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+  echo "ERROR: origin/main not found. Run: git remote -v && git fetch origin"
+  exit 1
+fi
+if [[ "$(git symbolic-ref -q HEAD || true)" != "refs/heads/main" ]]; then
+  echo "    checkout main (was detached or other branch)"
+  git checkout -B main origin/main
+else
+  git pull --ff-only origin main
+fi
+if ! grep -q '安全设置界面 v2' web-ui/src/pages/SettingsPage.tsx 2>/dev/null; then
+  echo "ERROR: source tree missing security UI v2 — not on latest main?"
+  exit 1
+fi
 
 echo "==> build web (no cache)"
 "${COMPOSE[@]}" build --no-cache web
