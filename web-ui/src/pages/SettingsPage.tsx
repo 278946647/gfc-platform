@@ -173,9 +173,18 @@ export function SettingsPage() {
             <Form.Item
               name="bootstrap_tokens"
               label="Bootstrap Token（转发节点激活）"
-              extra="与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
+              extra={
+                secEditable
+                  ? "与 install.env 中 BOOTSTRAP_TOKEN 一致；保存后自动同步到在线节点"
+                  : "已锁定 — 点击「解锁编辑」后方可修改"
+              }
             >
-              <Input readOnly={!secEditable} />
+              <Input.Password
+                visibilityToggle={secEditable}
+                disabled={!secEditable}
+                readOnly={!secEditable}
+                placeholder={secEditable ? "" : "已锁定"}
+              />
             </Form.Item>
             <Form.Item
               name="auth_secret"
